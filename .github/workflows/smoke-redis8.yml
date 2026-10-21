@@ -1,0 +1,24 @@
+name: smoke test redis 8 (bookworm vs trixie)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - smoke/redis8-trixie
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Build both bases (amd64, loaded locally)
+        run: |
+          for base in bookworm trixie; do
+            sed "s/redis:8-trixie/redis:8-$base/" redis/8/Dockerfile > /tmp/Dockerfile.$base
+            docker buildx build --load -t test:$base -f /tmp/Dockerfile.$base redis
+          done
+      - name: Build trixie for arm64 (build only)
+        run: docker buildx build --platform linux/arm64 -f redis/8/Dockerfile redis
+      - name: Smoke test
+        run: bash .github/smoke/redis8.sh
