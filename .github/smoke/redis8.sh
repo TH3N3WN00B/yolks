@@ -67,7 +67,7 @@ for base in bookworm trixie; do
     ip_real=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "r8-$base")
     [ "$ip_entry" = "$ip_real" ] && pass "$base: INTERNAL_IP parsing ($ip_entry)" || fail "$base: INTERNAL_IP '$ip_entry' != '$ip_real'"
     stop "r8-$base"
-    [ -s "$d/dump.rdb" ] && pass "$base: dump.rdb written on stop" || fail "$base: no dump.rdb after stop"
+    sudo test -s "$d/dump.rdb" && pass "$base: dump.rdb written on stop" || fail "$base: no dump.rdb after stop"
     start "r8b-$base" "$img" "$d" "$S8" "redis_version:" && [ "$(cli r8b-$base GET egg_key)" = from_console ] \
       && pass "$base: data survives a restart" || fail "$base: data lost after restart"
     stop "r8b-$base"
