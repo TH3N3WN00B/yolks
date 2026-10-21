@@ -1,0 +1,21 @@
+name: smoke test java 27 (resolute) vs java 26 (noble)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - smoke/java27
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Build java_26 and java_27 (amd64, loaded locally)
+        run: |
+          for v in 26 27; do docker buildx build --load -t test:java_$v -f java/$v/Dockerfile java; done
+      - name: Build java_27 for arm64 (build only)
+        run: docker buildx build --platform linux/arm64 -f java/27/Dockerfile java
+      - name: Smoke test
+        run: bash .github/smoke/java27.sh
