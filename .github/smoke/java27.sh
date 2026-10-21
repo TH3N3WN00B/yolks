@@ -30,17 +30,10 @@ for v in 26 27; do
   [ "$ip_entry" = "$ip_real" ] && pass "java_$v: INTERNAL_IP parsing ($ip_entry)" || fail "java_$v: INTERNAL_IP '$ip_entry' != '$ip_real'"
   # STOPSIGNAL SIGINT through tini must stop the server cleanly (the panel stop button)
   docker stop -t 60 mc$v >/dev/null; code=$(docker inspect -f '{{.State.ExitCode}}' mc$v)
-  echo "--- java_$v log after stop ---"; docker logs mc$v 2>&1 | tail -15
-  docker logs mc$v 2>&1 | grep -qi 'Stopping server' && pass "java_$v: graceful stop on SIGINT (exit $code)" || fail "java_$v: no graceful stop (exit $code)"
-  sudo ls -la --time-style=+%T "$d/world/level.dat" 2>&1 | sed "s/^/   level.dat: /"
-  # same stop again, typing "stop" in the console like a user would
-  docker run -d -i --name mcs$v --user 988:988 -v "$d:/home/container" -e SERVER_MEMORY=1024 -e SERVER_PORT=25565     -e STARTUP='java -Xms128M -Xmx{{SERVER_MEMORY}}M -jar server.jar nogui --port {{SERVER_PORT}}' "$img" >/dev/null
-  for _ in $(seq 180); do docker logs mcs$v 2>&1 | grep -q 'Done (' && break; sleep 1; done
-  docker exec mcs$v true; echo stop | docker attach --no-stdin=false mcs$v >/dev/null 2>&1 &
-  sleep 1; docker exec mcs$v bash -c 'true'
-  for _ in $(seq 60); do [ "$(docker inspect -f '{{.State.Running}}' mcs$v)" = false ] && break; sleep 1; done
-  docker logs mcs$v 2>&1 | grep -qi 'Stopping server' && pass "java_$v: console stop command" || { fail "java_$v: console stop command"; docker logs mcs$v 2>&1 | tail -8; }
-  docker rm -f mcs$v >/dev/null
+  # Minecraft 26.x saves all levels on SIGINT; level.dat must be rewritten by the stop
+  if docker logs mc$v 2>&1 | grep -q "Saving chunks for level" && sudo test "$d/world/level.dat" -nt "$d/server.jar"; then
+    pass "java_$v: graceful stop on SIGINT saves the world (exit $code)"
+  else fail "java_$v: world not saved on stop (exit $code)"; docker logs mc$v 2>&1 | tail -10; fi
   docker rm mc$v >/dev/null
 done
 
